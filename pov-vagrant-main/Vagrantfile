@@ -1,0 +1,65 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# vagrant up --provider vmware_desktop
+# vagrant up --provider virtualbox
+
+PUBLIC_KEY_PATH = '/Users/sai.linnthu/pov-vagrant/00-ubuntu-2404/.ssh/id_ed25519.pub'.freeze
+
+Vagrant.configure("2") do |config|
+
+    config.vm.define "ubuntu-2404" do |vm1|
+      vm1.vm.hostname = "ubuntu-2404"
+      vm1.vm.box = "bento/ubuntu-24.04"
+      vm1.vm.network "private_network", ip: "192.168.56.88" # vmnet2 private host-only network
+    #   vm1.vm.network "public_network", ip: "192.168.56.88", bridge: "en1" # vmnet2 public bridge mode network
+    #   vm1.vm.network "private_network", ip: "192.168.66.88" # vmnet3 private host-only network
+      vm1.vm.network "forwarded_port", guest: 8200, host: 8200, auto_correct: true # Vault HTTP API
+      vm1.vm.network "forwarded_port", guest: 9200, host: 9200, auto_correct: true # Boundary HTTP API
+      vm1.vm.network "forwarded_port", guest: 9090, host: 9090, auto_correct: true # Prometheus HTTP API
+      vm1.vm.network "forwarded_port", guest: 8500, host: 8500, auto_correct: true # Consul HTTP API
+      vm1.vm.network "forwarded_port", guest: 8000, host: 8000, auto_correct: true # Demo webapp
+      vm1.vm.network "forwarded_port", guest: 4646, host: 4646, auto_correct: true # Nomad HTTP API
+      vm1.vm.network "forwarded_port", guest: 3000, host: 3000, auto_correct: true # Grafana HTTP API
+      vm1.vm.synced_folder ".", "/home/vagrant/", disabled: true # disable mount local directory into VM
+      vm1.vm.provider "vmware_desktop" do |vmware|
+        vmware.memory = "1024"
+        vmware.cpus = 1
+        vmware.gui = false # set to true if you want to see the GUI in VMware Fusion
+      end
+
+      config.vm.provision 'shell' do |shell|
+        shell.inline = <<~DOC
+          # Allow us to SSH as `ssh vagrant@192.168.56.88` or `ssh 192.168.56.88` using our public key rather than using `vagrant ssh`
+          echo '#{IO.read(PUBLIC_KEY_PATH)}' >> /home/vagrant/.ssh/authorized_keys
+        DOC
+      end
+      
+      vm1.vm.provision "shell", run: "always", inline: <<-SHELL
+        sudo apt-get update
+        sudo apt-get install net-tools zip curl jq tree unzip wget siege apt-transport-https ca-certificates software-properties-common gnupg lsb-release -y
+        netstat -tunlp
+        echo "Hello from ubuntu-2404"
+      SHELL
+  
+    #   vm1.vm.provision "shell",
+    #     privileged: true,
+    #     path: './scripts/1-docker-install.sh'
+  
+    #   vm1.vm.provision "shell",
+    #     privileged: true,
+    #     path: './scripts/2-kubectl-install.sh'
+  
+    #   vm1.vm.provision "shell",
+    #     privileged: true,
+    #     path: './scripts/3-kind-install.sh'
+  
+    #   vm1.vm.provision "shell",
+    #     privileged: true,
+    #     path: './scripts/4-helm-install.sh'
+
+    #   vm1.vm.provision "shell",
+    #     privileged: true,
+    #     path: './scripts/8-grpcurl-install.sh'
+    end
+  end
